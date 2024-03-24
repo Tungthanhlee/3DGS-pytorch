@@ -5,7 +5,6 @@ import numpy as np
 from typing import Tuple, Optional
 from pytorch3d.ops.knn import knn_points
 from pytorch3d.renderer.cameras import PerspectiveCameras
-from pytorch3d.renderer import Transform3d
 import pytorch3d.transforms as T3d
 from data_utils import load_gaussians_from_ply, colours_from_spherical_harmonics
 from einops import rearrange, repeat
@@ -299,7 +298,7 @@ class Gaussians:
         ### YOUR CODE HERE ###
         # HINT: Can you extract the world to camera rotation matrix (W) from one of the inputs
         # of this function?
-        W = camera.get_world_to_view_transform()  # (N, 3, 3)
+        W = camera.get_world_to_view_transform().get_matrix()[:, :3, :3] # (N, 3, 3)
 
         ### YOUR CODE HERE ###
         # HINT: Can you find a function in this file that can help?
@@ -333,15 +332,9 @@ class Gaussians:
         # HINT: Do note that means_2D have units of pixels. Hence, you must apply a
         # transformation that moves points in the world space to screen space.
         
-        # transform points to camera coordinates
-        points_camera = camera.get_world_to_view_transform().transform_points(means_3D) # (N, 3)
-        
-        # project points to image plane
-        image_size = camera.get_image_size() # (H, W)
-        means_2D = camera.transform_points_screen(points_camera, image_size)[:, :2] 
-        
-        
-        # (N, 2)
+        H, W = camera.image_size[0] #Note that camera.image_size returns H,W. But the image_size parameters of cameras takes W,H.
+        means_2D = camera.transform_points_screen(means_3D, image_size=(W, H))[:,:2] # (N, 2)
+
         return means_2D
 
     @staticmethod
