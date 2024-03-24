@@ -376,13 +376,19 @@ class Gaussians:
             cov_2D_inverse  :   A torch.Tensor of shape (N, 2, 2) representing the
                                 inverse of the covariance matrices of N 2D Gaussians.
 
-        Returns:
+        Returns: 
             power           :   A torch.Tensor of shape (N, H*W) representing the computed
                                 power of the N 2D Gaussians at every pixel location in an image.
         """
         ### YOUR CODE HERE ###
         # HINT: Refer to README for a relevant equation
-        power = None  # (N, H*W)
+        # -0.5 * (x-mu)^T @ Sigma^-1 @ (x-mu)
+        diff = points_2D - means_2D # (N, HW, 2)
+        
+        product = diff @ cov_2D_inverse # (N, HW, 2)
+        
+        power = -0.5 * torch.sum(product * diff, dim=2)  # Shape is (N, H*W)
+        
 
         return power
 
