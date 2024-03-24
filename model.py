@@ -428,7 +428,13 @@ class Scene:
         ### YOUR CODE HERE ###
         # HINT: You can use get the means of 3D Gaussians self.gaussians and calculate
         # the depth using the means and the camera
-        z_vals = None  # (N,)
+        means_3D = self.gaussians.means  # (N, 3)
+        
+        #transform to camera view coordinates (is it needed?)
+        means_3D_cam = camera.get_world_to_view_transform().transform_points(means_3D) # (N, 3)
+        
+        # extract depth of each point as the 3rd coord of means_3D_cam
+        z_vals = means_3D_cam[..., 2:]
 
         return z_vals
 
@@ -449,7 +455,10 @@ class Scene:
         Please refer to the README file for more details.
         """
         ### YOUR CODE HERE ###
-        idxs = None  # (N,)
+        sorted_z_vals, idxs = torch.sort(z_vals, descending=False) # (M,)
+        
+        # filter out negative depth values
+        idxs = idxs[sorted_z_vals >= 0] # (N,)
 
         return idxs
 
