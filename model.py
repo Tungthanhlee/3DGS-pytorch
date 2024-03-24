@@ -5,7 +5,10 @@ import numpy as np
 from typing import Tuple, Optional
 from pytorch3d.ops.knn import knn_points
 from pytorch3d.renderer.cameras import PerspectiveCameras
+from pytorch3d.renderer import Transform3d
+import pytorch3d.transforms as T3d
 from data_utils import load_gaussians_from_ply, colours_from_spherical_harmonics
+from einops import rearrange, repeat
 
 class Gaussians:
 
@@ -238,13 +241,33 @@ class Gaussians:
         if self.is_isotropic:
 
             ### YOUR CODE HERE ###
-            cov_3D = None  # (N, 3, 3)
+            #convert diagonal scales to 3x3 matrix
+            S = torch.diag_embed(scales.repeat(1, 3)) # (N, 3, 3)
+            
+            #normalized quats to obtain a valid unit quaternion
+            normalized_quaternions = T3d.standardize_quaternion(quats)
+            
+            # convert quaternions to rotation matrices
+            R = T3d.quaternion_to_matrix(normalized_quaternions) # (N, 3, 3)
+            
+            # compute covariance matrix
+            cov_3D = R@S @ (R@S).transpose(1,2)  # (N, 3, 3)
 
         # HINT: You can use a function from pytorch3d to convert quaternions to rotation matrices.
         else:
 
             ### YOUR CODE HERE ###
-            cov_3D = None  # (N, 3, 3)
+            #convert diagonal scales to 3x3 matrix
+            S = torch.diag_embed(scales) # (N, 3, 3)
+            
+            #normalized quats to obtain a valid unit quaternion
+            normalized_quaternions = T3d.standardize_quaternion(quats)
+            
+            # convert quaternions to rotation matrices
+            R = T3d.quaternion_to_matrix(normalized_quaternions) # (N, 3, 3)
+            
+            # compute covariance matrix
+            cov_3D = R@S @ (R@S).transpose(1,2) # (N, 3, 3)
 
         return cov_3D
 
@@ -267,24 +290,24 @@ class Gaussians:
             img_size    :   A tuple representing the (width, height) of the image
 
         Returns:
-            cov_3D  :   A torch.Tensor of shape (N, 3, 3)
+            cov_2D  :   A torch.Tensor of shape (N, 2, 2)
         """
         ### YOUR CODE HERE ###
         # HINT: For computing the jacobian J, can you find a function in this file that can help?
-        J = None  # (N, 2, 3)
+        J = self._compute_jacobian(means_3D, camera, img_size)  # (N, 2, 3)
 
         ### YOUR CODE HERE ###
         # HINT: Can you extract the world to camera rotation matrix (W) from one of the inputs
         # of this function?
-        W = None  # (N, 3, 3)
+        W = camera.get_world_to_view_transform()  # (N, 3, 3)
 
         ### YOUR CODE HERE ###
         # HINT: Can you find a function in this file that can help?
-        cov_3D = None  # (N, 3, 3)
+        cov_3D = self.compute_cov_3D(quats, scales)  # (N, 3, 3)
 
         ### YOUR CODE HERE ###
         # HINT: Use the above three variables to compute cov_2D
-        cov_2D = None  # (N, 2, 2)
+        cov_2D = J @ W @ cov_3D @ W.transpose(1,2) @ J.transpose(1,2)  # (N, 2, 2)
 
         # Post processing to make sure that each 2D Gaussian covers atleast approximately 1 pixel
         cov_2D[:, 0, 0] += 0.3
@@ -309,7 +332,16 @@ class Gaussians:
         ### YOUR CODE HERE ###
         # HINT: Do note that means_2D have units of pixels. Hence, you must apply a
         # transformation that moves points in the world space to screen space.
-        means_2D = None  # (N, 2)
+        
+        # transform points to camera coordinates
+        points_camera = camera.get_world_to_view_transform().transform_points(means_3D) # (N, 3)
+        
+        # project points to image plane
+        image_size = camera.get_image_size() # (H, W)
+        means_2D = camera.transform_points_screen(points_camera, image_size)[:, :2] 
+        
+        
+        # (N, 2)
         return means_2D
 
     @staticmethod
