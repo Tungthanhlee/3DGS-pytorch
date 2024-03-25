@@ -1,4 +1,4 @@
-# Simplify re-implementation of 3DGS 
+# Pytorch implementation of 3DGS 
 
 ## 1.1 3D Gaussian Rasterization (35 points)
 
