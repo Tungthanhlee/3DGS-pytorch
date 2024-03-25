@@ -11,11 +11,19 @@ from torch.utils.data import DataLoader
 from data_utils import CowDataset, visualize_renders
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
+import torch.nn as nn
+
 def make_trainable(gaussians):
 
     ### YOUR CODE HERE ###
     # HINT: You can access and modify parameters from gaussians
-    pass
+    # pass
+    if not gaussians.is_isotropic:
+        gaussians.pre_act_quats.requires_grad_()
+    gaussians.means.requires_grad_()
+    gaussians.pre_act_scales.requires_grad_()
+    gaussians.colours.requires_grad_()
+    gaussians.pre_act_opacities.requires_grad_()
 
 def setup_optimizer(gaussians):
 
@@ -28,13 +36,13 @@ def setup_optimizer(gaussians):
     # fast with the default settings.
     # HINT: Consider setting different learning rates for different sets of parameters.
     parameters = [
-        {'params': [gaussians.pre_act_opacities], 'lr': 0.05, "name": "opacities"},
-        {'params': [gaussians.pre_act_scales], 'lr': 0.05, "name": "scales"},
-        {'params': [gaussians.colours], 'lr': 0.05, "name": "colours"},
-        {'params': [gaussians.means], 'lr': 0.05, "name": "means"},
+        {'params': [gaussians.pre_act_opacities], 'lr': 0.001, "name": "opacities"},
+        {'params': [gaussians.pre_act_scales], 'lr': 0.001, "name": "scales"},
+        {'params': [gaussians.colours], 'lr': 0.001, "name": "colours"},
+        {'params': [gaussians.means], 'lr': 0.0001, "name": "means"},
     ]
-    optimizer = torch.optim.Adam(parameters, lr=0.0, eps=1e-15)
-    optimizer = None
+    optimizer = torch.optim.Adam(parameters, lr=0.0001, eps=1e-15)
+    # optimizer = None
 
     return optimizer
 
@@ -78,6 +86,9 @@ def run_training(args):
     # Making gaussians trainable and setting up optimizer
     make_trainable(gaussians)
     optimizer = setup_optimizer(gaussians)
+    
+    # loss function
+    loss_fn = nn.L1Loss()
 
     # Training loop
     viz_frames = []
@@ -104,12 +115,19 @@ def run_training(args):
         # HINT: Get img_size from train_dataset
         # HINT: Get per_splat from args.gaussians_per_splat
         # HINT: camera is available above
-        pred_img = None
+        # pred_img = 
+        pred_img, _, _ = scene.render(
+            camera,
+            per_splat=args.gaussians_per_splat,
+            img_size=train_dataset.img_size,
+            bg_colour=(0.0, 0.0, 0.0),
+        )
 
         # Compute loss
         ### YOUR CODE HERE ###
         # HINT: A simple standard loss function should work.
-        loss = None
+        # loss = None
+        loss = loss_fn(pred_img, gt_img)
 
         loss.backward()
         optimizer.step()
@@ -151,7 +169,13 @@ def run_training(args):
             # HINT: Get img_size from train_dataset
             # HINT: Get per_splat from args.gaussians_per_splat
             # HINT: camera is available above
-            pred_img = None
+            # pred_img = None
+            pred_img, _, _ = scene.render(
+                camera,
+                per_splat=args.gaussians_per_splat,
+                img_size=train_dataset.img_size,
+                bg_colour=(0.0, 0.0, 0.0),
+            )
 
         pred_npy = pred_img.detach().cpu().numpy()
         pred_npy = (np.clip(pred_npy, 0.0, 1.0) * 255.0).astype(np.uint8)
@@ -179,7 +203,13 @@ def run_training(args):
             # HINT: Get img_size from test_dataset
             # HINT: Get per_splat from args.gaussians_per_splat
             # HINT: camera is available above
-            pred_img = None
+            # pred_img = None
+            pred_img, _, _ = scene.render(
+                camera,
+                per_splat=args.gaussians_per_splat,
+                img_size=test_dataset.img_size,
+                bg_colour=(0.0, 0.0, 0.0),
+            )
 
             gt_npy = gt_img.detach().cpu().numpy()
             pred_npy = pred_img.detach().cpu().numpy()
