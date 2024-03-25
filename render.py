@@ -53,7 +53,13 @@ def create_renders(args):
             # HINT: Set bg_colour to (1.0, 1.0, 1.0)
             # HINT: Get per_splat from args.gaussians_per_splat
             # HINT: img_size and camera are available above
-            img, depth, mask = None
+            # img, depth, mask = None
+            img, depth, mask = scene.render(
+                camera,
+                per_splat=args.gaussians_per_splat,
+                img_size=img_size,
+                bg_colour=(1.0, 1.0, 1.0),
+            )
 
         debug_path = os.path.join(debug_root, f"{i:03d}.png")
         img = img.detach().cpu().numpy()
