@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=3 python render.py --gaussians_per_splat 2048
+CUDA_VISIBLE_DEVICES=3 python render.py --gaussians_per_splat 16384

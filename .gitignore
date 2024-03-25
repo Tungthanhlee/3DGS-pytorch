@@ -1,3 +1,4 @@
 data/
 *.ipynb
 __pycache__/
+*.png

@@ -1,6 +1,7 @@
 import math
 import torch
 import numpy as np
+from tqdm import tqdm
 
 from typing import Tuple, Optional
 from pytorch3d.ops.knn import knn_points
@@ -434,7 +435,7 @@ class Scene:
         means_3D_cam = camera.get_world_to_view_transform().transform_points(means_3D) # (N, 3)
         
         # extract depth of each point as the 3rd coord of means_3D_cam
-        z_vals = means_3D_cam[..., 2:]
+        z_vals = means_3D_cam[..., 2]
 
         return z_vals
 
@@ -458,7 +459,7 @@ class Scene:
         sorted_z_vals, idxs = torch.sort(z_vals, descending=False) # (M,)
         
         # filter out negative depth values
-        idxs = idxs[sorted_z_vals >= 0] # (N,)
+        idxs = idxs[sorted_z_vals > 0] # (N,)
 
         return idxs
 
@@ -560,7 +561,7 @@ class Scene:
 
         ### YOUR CODE HERE ###
         # HINT: Refer to README for a relevant equation.
-        transmittance = torch.cumprod(one_minus_alphas, dim=0)[:alphas.shape[0],...] # (N, H, W)
+        transmittance = torch.cumprod(one_minus_alphas, dim=0)[1:,...] # (N, H, W)
         # transmittance = None  # (N, H, W)
 
         # Post processing for numerical stability
@@ -639,22 +640,25 @@ class Scene:
         transmittance = transmittance[..., None]  # (N, H, W, 1)
 
         # Step 4: Create image, depth and mask by computing the colours for each pixel.
-
+        prod_alphas_transmittance = alphas * transmittance  # (N, H, W, 1)
+        
         ### YOUR CODE HERE ###
         # HINT: Refer to README for a relevant equation
-        image = torch.sum(colours * alphas * transmittance, dim=0) # (H, W, 3)
+        image = torch.sum(colours * prod_alphas_transmittance, dim=0) # (H, W, 3)
         # image = None  # (H, W, 3)
 
         ### YOUR CODE HERE ###
         # HINT: Can you implement an equation inspired by the equation for colour?
-        depth = torch.sum(z_vals * alphas * transmittance, dim=0)  # (H, W, 1)
+        # print("z_vals", z_vals.shape)
+        depth = torch.sum(z_vals * prod_alphas_transmittance, dim=0)  # (H, W, 1)
         # depth = None  # (H, W, 1)
 
         ### YOUR CODE HERE ###
         # HINT: Can you implement an equation inspired by the equation for colour?
-        mask = torch.sum(alphas * transmittance, dim=0)  # (H, W, 1) 
+        mask = torch.sum(prod_alphas_transmittance, dim=0)  # (H, W, 1) 
 
         final_transmittance = transmittance[-1, ..., 0].unsqueeze(0)  # (1, H, W)
+        # print("final_transmittance", final_transmittance.shape)
         return image, depth, mask, final_transmittance
 
     def render(
@@ -740,7 +744,7 @@ class Scene:
             depth = torch.zeros((H, W, 1), dtype=torch.float32).to(D)
             mask = torch.zeros((H, W, 1), dtype=torch.float32).to(D)
 
-            for b_idx in range(num_mini_batches):
+            for b_idx in tqdm(range(num_mini_batches)):
 
                 quats_ = quats[b_idx * per_splat: (b_idx+1) * per_splat]
                 scales_ = scales[b_idx * per_splat: (b_idx+1) * per_splat]
@@ -754,10 +758,11 @@ class Scene:
                     camera, means_3D_, z_vals_, quats_, scales_, colours_,
                     opacities_, img_size, start_transmittance
                 )
-
+                # print(image_.shape, depth_.shape, mask_.shape)
                 image = image + image_
-                depth = depth + depth_
+                
                 mask = mask + mask_
+                depth = depth + depth_
 
         image = mask * image + (1.0 - mask) * bg_colour_
 
