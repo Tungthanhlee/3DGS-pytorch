@@ -41,7 +41,7 @@ def setup_optimizer(gaussians):
         {'params': [gaussians.colours], 'lr': 0.0001, "name": "colours"},
         {'params': [gaussians.means], 'lr': 0.000016, "name": "means"},
     ]
-    optimizer = torch.optim.Adam(parameters, lr=0.00001, eps=1e-15)
+    optimizer = torch.optim.Adam(parameters, lr=0, eps=1e-15)
     # optimizer = None
 
     return optimizer
